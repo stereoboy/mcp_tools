@@ -2,6 +2,13 @@
 
 A TypeScript implementation of a web-based chat interface using OpenAI's API directly. This version includes type safety and modern React practices.
 
+<img src="../docs/screenshots/screenshot_2025_05_13_01.png" width="640">
+
+- Try asking the chat things like:
+  - "Check the status of the Rover."
+  - "What is the Picking Machine doing?"
+  - "Is the Processing Machine ready?"
+
 ## Features
 
 - TypeScript support for better type safety

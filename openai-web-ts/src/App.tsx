@@ -2,6 +2,42 @@ import { useState } from 'react'
 import OpenAI from 'openai'
 import { Message, ChatState } from './types'
 import './App.css'
+import { roverTool } from './tools/Rover'
+import { pickingMachineTool } from './tools/PickingMachine'
+import { processingMachineTool } from './tools/ProcessingMachine'
+
+const toolSchemas = [
+  {
+    type: 'function',
+    function: {
+      name: 'roverTool',
+      description: 'Returns the status of the Rover tool.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'pickingMachineTool',
+      description: 'Returns the status of the Picking Machine tool.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+  {
+    type: 'function',
+    function: {
+      name: 'processingMachineTool',
+      description: 'Returns the status of the Processing Machine tool.',
+      parameters: { type: 'object', properties: {}, required: [] },
+    },
+  },
+]
+
+const toolFunctions: Record<string, () => string> = {
+  roverTool,
+  pickingMachineTool,
+  processingMachineTool,
+}
 
 function App() {
   const [state, setState] = useState<ChatState>({
@@ -23,31 +59,48 @@ function App() {
 
     try {
       const openai = new OpenAI({
-        apiKey: import.meta.env.VITE_OPENAI_API_KEY,
+        apiKey: (import.meta as any).env.VITE_OPENAI_API_KEY,
         dangerouslyAllowBrowser: true // Note: In production, you should use a backend
       })
 
+      // Prepare chat history for OpenAI
+      const chatMessages = state.messages.map((msg) => ({
+        role: msg.role === 'user' ? 'user' : 'assistant',
+        content: msg.content,
+      }))
+      chatMessages.push({ role: 'user', content: state.input })
+
       const response = await openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
-        messages: [
-          ...state.messages.map(msg => ({
-            role: msg.role === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          })),
-          { role: 'user', content: state.input }
-        ],
-        temperature: 0.7,
+        model: 'gpt-3.5-turbo',
+        messages: chatMessages as any,
+        tools: toolSchemas as any,
       })
 
-      const assistantMessage: Message = {
-        role: 'assistant',
-        content: response.choices[0]?.message?.content || 'No response from AI'
-      }
+      const choice = response.choices[0]
+      const finishReason = choice.finish_reason
+      const aiMessage = choice.message
 
-      setState(prev => ({
-        ...prev,
-        messages: [...prev.messages, assistantMessage]
-      }))
+      if (finishReason === 'tool_calls' && aiMessage.tool_calls) {
+        // Only handle the first tool call for simplicity
+        const toolCall = aiMessage.tool_calls[0]
+        const toolName = toolCall.function.name
+        const toolResult = toolFunctions[toolName]()
+        setState(prev => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            { role: 'assistant', content: `Function ${toolName} called. Result: ${toolResult}` },
+          ],
+        }))
+      } else {
+        setState(prev => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            { role: 'assistant', content: aiMessage.content || '' },
+          ],
+        }))
+      }
     } catch (error) {
       console.error('Error:', error)
       const errorMessage: Message = {
@@ -68,7 +121,7 @@ function App() {
 
   return (
     <div className="chat-container">
-      <h1>OpenAI Chat Demo</h1>
+      <h1>OpenAI Chat Demo (with Tools)</h1>
       <div className="messages">
         {state.messages.map((message, index) => (
           <div key={index} className={`message ${message.role}`}>
