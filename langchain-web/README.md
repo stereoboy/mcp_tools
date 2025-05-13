@@ -2,6 +2,8 @@
 
 This is a web-based implementation of the MCP (Machine Conversation Protocol) using LangChain.js and OpenAI's GPT-3.5 model. The application provides a simple chat interface for interacting with the AI model.
 
+<img src="../docs/screenshots/screenshot_2025_05_13_00.png" width="640">
+
 ## Features
 
 - Real-time chat interface
