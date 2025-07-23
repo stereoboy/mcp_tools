@@ -1,3 +1,19 @@
+# Gemini Web Chat (TypeScript)
+
+**Setup Gemini API Key:**
+1. Create a `.env` file in this directory:
+   ```bash
+   touch .env
+   ```
+2. Add your Gemini API key:
+   ```env
+   VITE_GEMINI_API_KEY=your_gemini_api_key_here
+   ```
+
+---
+
+A TypeScript implementation of a web-based chat interface using Gemini's API directly. This version includes type safety and modern React practices.
+
 # Node
 
 * Use node v20
