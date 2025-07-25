@@ -68,64 +68,58 @@ function App() {
     // Add user's message to local state immediately
     setMessages((msgs) => [...msgs, userMessage]);
     contents.push({ role: 'user', parts: [{ text: input }] });
-    // const conversationSoFar = [...messages, userMessage];
 
     setInput('');
     setLoading(true);
     try {
-      // // Convert our internal message list to the SDK's "contents" format
-      // const contents = conversationSoFar.map((msg) => ({
-      //   role: msg.sender === 'user' ? 'user' : 'model',
-      //   parts: [{ text: msg.text }],
-      // }));
-
       console.log(contents);
-      const response = await ai.models.generateContent({
+      let response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents,
         config: config
       });
 
-      // Check if the model wanted to call a function
-      console.log('response', response);
-      if (response.functionCalls && response.functionCalls.length > 0) {
-        console.log('response.functionCalls', response.functionCalls);
-        for (const fn of response.functionCalls) {
-          console.log('fn', fn);
-          const { name, args } = fn;
-          if (name && args) {
-            const handler = toolHandlers[name];
-            const toolResult = handler ? handler(args) : `No handler for ${name}`;
-            setMessages((msgs) => [...msgs, { sender: 'tools', text: `${name}(${JSON.stringify(args, null, 2)}) returns: ${toolResult}` }]);
-            contents.push(response.candidates[0]?.content);
-            contents.push({
-              role: 'user', parts: [
-                {
-                  functionResponse:
+      while (true) {
+        // Check if the model wanted to call a function
+        console.log('response', response);
+        if (response.functionCalls && response.functionCalls.length > 0) {
+          console.log('response.functionCalls', response.functionCalls);
+          for (const fn of response.functionCalls) {
+            console.log('fn', fn);
+            const { name, args } = fn;
+            if (name && args) {
+              const handler = toolHandlers[name];
+              const toolResult = handler ? handler(args) : `No handler for ${name}`;
+              setMessages((msgs) => [...msgs, { sender: 'tools', text: `${name}(${JSON.stringify(args, null, 2)}) returns: ${toolResult}` }]);
+              contents.push(response.candidates[0]?.content);
+              contents.push({
+                role: 'user', parts: [
                   {
-                    name: name,
-                    response: { toolResult }
+                    functionResponse:
+                    {
+                      name: name,
+                      response: { toolResult }
+                    }
                   }
-                }
-              ]
-            });
-            console.log('contents', contents);
+                ]
+              });
+              console.log('contents', contents);
+            }
           }
+
+          response = await ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: config
+          });
+        } else {
+          const geminiText = response.text ?? 'No response.';
+          setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
+          contents.push(response.candidates[0]?.content);
+          break;
         }
-
-        const final_response = await ai.models.generateContent({
-          model: 'gemini-2.5-flash',
-          contents: contents,
-          config: config
-        });
-
-        setMessages((msgs) => [...msgs, { sender: 'gemini', text: final_response.text ?? 'No response.' }]);
-        contents.push(final_response.candidates[0]?.content);
-      } else {
-        const geminiText = response.text ?? 'No response.';
-        setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
-        contents.push(response.candidates[0]?.content);
       }
+
     } catch (e) {
       console.error(e);
       setMessages((msgs) => [...msgs, { sender: 'gemini', text: 'Error contacting Gemini API.' }]);
