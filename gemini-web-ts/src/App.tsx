@@ -18,14 +18,25 @@ function App() {
   const sendMessage = async () => {
     if (!input.trim()) return;
     const userMessage: Message = { sender: 'user', text: input };
+    // Add user's message to local state immediately
     setMessages((msgs) => [...msgs, userMessage]);
+    const conversationSoFar = [...messages, userMessage];
+
     setInput('');
     setLoading(true);
     try {
+      // Convert our internal message list to the SDK's "contents" format
+      const contents = conversationSoFar.map((msg) => ({
+        role: msg.sender === 'user' ? 'user' : 'model',
+        parts: [{ text: msg.text }],
+      }));
+
+      console.log(contents);
       const result = await ai.models.generateContent({
         model: 'gemini-2.0-flash-001',
-        contents: userMessage.text,
+        contents,
       });
+
       const geminiText = result.text ?? 'No response.';
       setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
     } catch (e) {
