@@ -1,5 +1,7 @@
 # Gemini Web Chat (TypeScript)
 
+<img src="../docs/screenshots/screenshot_2025_07_25_00.png" width="640">
+
 **Setup Gemini API Key:**
 1. Create a `.env` file in this directory:
    ```bash

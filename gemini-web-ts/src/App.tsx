@@ -54,25 +54,30 @@ const config = {
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
+  const contentsRef = useRef<any[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+
+    const contents = contentsRef.current;
+
     const userMessage: Message = { sender: 'user', text: input };
     // Add user's message to local state immediately
     setMessages((msgs) => [...msgs, userMessage]);
-    const conversationSoFar = [...messages, userMessage];
+    contents.push({ role: 'user', parts: [{ text: input }] });
+    // const conversationSoFar = [...messages, userMessage];
 
     setInput('');
     setLoading(true);
     try {
-      // Convert our internal message list to the SDK's "contents" format
-      const contents = conversationSoFar.map((msg) => ({
-        role: msg.sender === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }],
-      }));
+      // // Convert our internal message list to the SDK's "contents" format
+      // const contents = conversationSoFar.map((msg) => ({
+      //   role: msg.sender === 'user' ? 'user' : 'model',
+      //   parts: [{ text: msg.text }],
+      // }));
 
       console.log(contents);
       const response = await ai.models.generateContent({
@@ -91,7 +96,7 @@ function App() {
           if (name && args) {
             const handler = toolHandlers[name];
             const toolResult = handler ? handler(args) : `No handler for ${name}`;
-            setMessages((msgs) => [...msgs, { sender: 'gemini', text: toolResult }]);
+            setMessages((msgs) => [...msgs, { sender: 'tools', text: `${name}(${JSON.stringify(args, null, 2)}) returns: ${toolResult}` }]);
             contents.push(response.candidates[0]?.content);
             contents.push({
               role: 'user', parts: [
@@ -119,13 +124,16 @@ function App() {
       } else {
         const geminiText = response.text ?? 'No response.';
         setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
+        contents.push(response.candidates[0]?.content);
       }
     } catch (e) {
+      console.error(e);
       setMessages((msgs) => [...msgs, { sender: 'gemini', text: 'Error contacting Gemini API.' }]);
     } finally {
       setLoading(false);
       inputRef.current?.focus();
     }
+    contentsRef.current = contents;
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
