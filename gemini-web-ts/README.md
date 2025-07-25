@@ -14,6 +14,12 @@
 
 A TypeScript implementation of a web-based chat interface using Gemini's API directly. This version includes type safety and modern React practices.
 
+## Tools
+
+### Sample Questions
+```
+What time is it now and How is the weather in Seoul?
+```
 # Node
 
 * Use node v20

@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-import { GoogleGenAI } from '@google/genai';
+import { GoogleGenAI, Type } from '@google/genai';
 
 interface Message {
   sender: 'user' | 'gemini';
@@ -8,6 +8,49 @@ interface Message {
 
 const API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 const ai = new GoogleGenAI({ apiKey: API_KEY });
+
+// Tool declarations for Gemini function calling
+const getCurrentTimeFunctionDeclaration = {
+  name: 'get_current_time',
+  description: 'Returns the current local date and time as a string',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      location: {
+        type: Type.STRING,
+        description: 'The location to get the current time for',
+      },
+    },
+  },
+};
+
+const getCurrentWeatherFunctionDeclaration = {
+  name: 'get_current_weather',
+  description: 'Returns the current weather as a string',
+  parameters: {
+    type: Type.OBJECT,
+    properties: {
+      location: {
+        type: Type.STRING,
+        description: 'The location to get the current weather for',
+      },
+    },
+  },
+};
+
+// Map of tool name to local handler
+const toolHandlers: Record<string, (args: any) => string> = {
+  get_current_time: () => new Date().toLocaleString(),
+  get_current_weather: () => 'The current weather is sunny and 70 degrees.',
+};
+
+const config = {
+  tools: [
+    {
+      functionDeclarations: [getCurrentTimeFunctionDeclaration, getCurrentWeatherFunctionDeclaration],
+    },
+  ],
+};
 
 function App() {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,13 +75,51 @@ function App() {
       }));
 
       console.log(contents);
-      const result = await ai.models.generateContent({
+      const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents,
+        config: config
       });
 
-      const geminiText = result.text ?? 'No response.';
-      setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
+      // Check if the model wanted to call a function
+      console.log('response', response);
+      if (response.functionCalls && response.functionCalls.length > 0) {
+        console.log('response.functionCalls', response.functionCalls);
+        for (const fn of response.functionCalls) {
+          console.log('fn', fn);
+          const { name, args } = fn;
+          if (name && args) {
+            const handler = toolHandlers[name];
+            const toolResult = handler ? handler(args) : `No handler for ${name}`;
+            setMessages((msgs) => [...msgs, { sender: 'gemini', text: toolResult }]);
+            contents.push(response.candidates[0]?.content);
+            contents.push({
+              role: 'user', parts: [
+                {
+                  functionResponse:
+                  {
+                    name: name,
+                    response: { toolResult }
+                  }
+                }
+              ]
+            });
+            console.log('contents', contents);
+          }
+        }
+
+        const final_response = await ai.models.generateContent({
+          model: 'gemini-2.5-flash',
+          contents: contents,
+          config: config
+        });
+
+        setMessages((msgs) => [...msgs, { sender: 'gemini', text: final_response.text ?? 'No response.' }]);
+        contents.push(final_response.candidates[0]?.content);
+      } else {
+        const geminiText = response.text ?? 'No response.';
+        setMessages((msgs) => [...msgs, { sender: 'gemini', text: geminiText }]);
+      }
     } catch (e) {
       setMessages((msgs) => [...msgs, { sender: 'gemini', text: 'Error contacting Gemini API.' }]);
     } finally {
